@@ -50,3 +50,4 @@ src/data/*
 src/metastore_db/*
 *.log
 sandbox.py
+*.pyc
