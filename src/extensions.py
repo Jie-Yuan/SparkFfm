@@ -1,5 +1,6 @@
 from pyspark import AccumulatorParam
 from operator import add
+import numpy
 
 class Extensions:
 
@@ -12,6 +13,13 @@ class Extensions:
 			a = [0 if x == None else x for x in a]
 			b = [0 if x == None else x for x in b]
 			return map(add, a, b)
+	
+	class ArrayAccumulatorParam(AccumulatorParam):
+		def zero(self, initialValue):
+			return numpy.zeros(initialValue.shape)
+		
+		def addInPlace(self, a, b):
+			return numpy.add(a, b)
 	
 	class ArgumentException(Exception):
 		pass
