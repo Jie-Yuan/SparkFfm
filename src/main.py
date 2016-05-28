@@ -1,37 +1,61 @@
 from pyspark import *
 import math
+import os
+import shutil
+import sys
+import numpy
 
 #sparkFFM
-from extendedrdd import ExtendedRDD
+from mixeddata import MixedData
 from preprocessing import PreProcessing
 from extensions import Extensions
+from logger import Logger
+from model import Model
 
 ###MAIN###
 		
 sc = SparkContext("local", "Main")
 
 #TODO: if requiresPreprocessing
-dataFilePath = "data/dac_sample.txt"
+textFilePath = "data/dac_sample.txt"
 headerFilePath = "data/dac_header.txt"
 preprocessedTextPath = "data/preprocessed-text"
 preprocessedSerPath = "data/preprocessed-ser"
+weightsPath = "data/weights"
 
-data = ExtendedRDD(sc, dataFilePath, headerFilePath)
-data.rdd.persist()
+usePPD = False
+if '-usePPD' in sys.argv:
+	if os.path.exists(preprocessedSerPath):
+		usePPD = True
+	else:
+		Logger.warn('No pre-processed data exists. Using raw data instead.')
 
-print(data.rdd.take(1))
+if usePPD:
+	data = MixedData(sc, preprocessedSerPath, headerFilePath)
+else:
+	data = MixedData(sc, textFilePath, headerFilePath)
+	
+	Logger.info('Preprocessing data...')
+	data.preprocess()
+	Logger.info('Complete.')
+	
+	Logger.info('Deleting any existing pre-processed data...')
+	for path in [preprocessedTextPath, preprocessedSerPath]:
+		shutil.rmtree(path, ignore_errors = True)
+	Logger.info('Complete.')
+	
+	Logger.info('Saving pre-processed data to disk...')
+	data.rdd.persist()
+	data.rdd.saveAsTextFile(preprocessedTextPath)
+	data.rdd.saveAsPickleFile(preprocessedSerPath)
+	Logger.info('Complete.')
 
-data = PreProcessing.normaliseInts(data)
+model = Model(data)
 
-print(data.rdd.take(1))
+model.stochasticGradientDescent(data)
 
-data = PreProcessing.hashCategoricalsToInts(data)
-
-print(data.rdd.take(1))
-
-data.rdd.saveAsTextFile(preprocessedTextPath)
-data.rdd.saveAsPickleFile(preprocessedSerPath)
-
+numpy.savetxt(weightsPath + '/integer', model.weights.integer)
+numpy.savetxt(weightsPath + '/categorical', model.weights.categorical)
 
 			
 	
